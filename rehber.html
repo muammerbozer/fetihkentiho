@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1769aa">
+<title>Hızlı Arama Rehberi</title>
+<style>
+:root{--blue:#1769aa;--dark:#124a7b;--bg:#f2f5f9;--ink:#172435;--muted:#607286;--line:#dfe7ef;--green:#16834a;--danger:#d32f2f}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:linear-gradient(135deg,var(--dark),#2186c7);color:#fff;padding:20px 14px;text-align:center}
+h1{margin:0 0 5px;font-size:clamp(22px,5vw,29px)}header p{margin:0;font-size:14px;opacity:.92}
+main{max-width:900px;margin:auto;padding:14px}
+.toolbar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.btn{border:0;border-radius:10px;padding:12px 8px;font-weight:700;font-size:14px;cursor:pointer;background:#fff;color:#174c78;box-shadow:0 2px 7px #10243b12}
+.btn.primary{background:var(--blue);color:#fff}.btn.green{background:var(--green);color:#fff}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+.section-head h2{font-size:17px;margin:0;overflow-wrap:anywhere}
+.people,.group-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start}
+.person{display:flex;align-items:stretch;min-width:0;min-height:76px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 2px 7px #10243b0c}
+.call{flex:1;min-width:0;border:0;background:transparent;text-align:left;padding:13px 11px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.call:active,.group-item-btn:active{background:#e8f4ff}
+.name{font-size:15px;font-weight:700;overflow-wrap:anywhere}.number{font-size:13px;color:#526579;overflow-wrap:anywhere}.phone{align-self:center;color:var(--green);font-size:19px;padding:0 10px}
+.person.editor{display:block;padding:9px}.person.editor .call,.person.editor .phone{display:none}
+.fields{display:grid;gap:7px;width:100%}.fields input,.modal input{width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:8px;padding:10px;font:inherit;background:#fff}
+.field-buttons{display:flex;gap:6px}
+.smallbtn{border:0;border-radius:8px;padding:10px;background:var(--blue);color:#fff;font-weight:700;cursor:pointer;flex:1}
+.delbtn{border:0;border-radius:8px;padding:10px 12px;background:#ffebee;color:var(--danger);font-weight:700;cursor:pointer;border:1px solid #ffcdd2}
+.delbtn:hover{background:#ffcdd2}
+.group-card{display:flex;align-items:center;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 2px 7px #10243b0c;overflow:hidden}
+.group-item-btn{flex:1;border:0;background:transparent;padding:15px 12px;text-align:left;font-weight:700;font-size:15px;color:var(--ink);cursor:pointer;overflow-wrap:anywhere;min-height:58px}
+.group-del-btn{border:0;background:transparent;color:var(--danger);padding:0 14px;font-size:16px;cursor:pointer;height:100%;display:flex;align-items:center;justify-content:center}
+.group-del-btn:hover{background:#ffebee}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:18px 8px;line-height:1.5}
+.back{border:0;background:transparent;color:var(--blue);font-weight:700;cursor:pointer;padding:0;font-size:14px}
+.danger-link{border:0;background:transparent;color:var(--danger);font-weight:700;cursor:pointer;padding:0;font-size:13px}
+.modal-backdrop{position:fixed;inset:0;background:#0c1c2c80;display:none;align-items:center;justify-content:center;padding:16px;z-index:5}
+.modal-backdrop.open{display:flex}.modal{background:#fff;border-radius:16px;padding:20px;width:min(100%,420px);box-shadow:0 15px 50px #0003}
+.modal h2{font-size:21px;margin:0 0 8px}.modal p{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.45}
+.modal form{display:grid;gap:10px}.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.note{font-size:12px;color:var(--muted);text-align:center;line-height:1.5;margin:16px 0 4px}
+.hidden{display:none!important}
+@media(max-width:420px){main{padding:10px}.toolbar{gap:6px}.btn{font-size:12px;padding:11px 4px}.people,.group-list{gap:8px}.call{padding:11px 8px}.name{font-size:13px}.number{font-size:11px}.phone{font-size:17px;padding:0 7px}.person{min-height:70px}}
+</style>
+</head>
+<body>
+<header><h1>📞 Hızlı Arama Rehberi</h1><p>Kişilerini düzenle, gruplarını oluştur, kolayca ara.</p></header>
+<main>
+  <nav class="toolbar">
+    <button class="btn" id="editToggle" type="button">✏️ Kişileri Düzenle</button>
+    <button class="btn primary" id="groupsButton" type="button">📂 Gruplar</button>
+    <button class="btn green" id="addGroup" type="button">＋ Grup Ekle</button>
+  </nav>
+
+  <section id="homeView">
+    <div class="section-head"><h2>Ana Sayfa</h2><span id="homeCount" style="font-size:12px;color:#607286"></span></div>
+    <div class="people" id="homePeople"></div>
+  </section>
+
+  <section id="groupsView" class="hidden">
+    <div class="section-head"><h2>Gruplarım</h2><button class="back" id="backHome" type="button">← Ana sayfa</button></div>
+    <div class="group-list" id="groupList"></div>
+    <div class="empty hidden" id="groupsEmpty">Henüz grup yok. Sağdaki “Grup Ekle” düğmesiyle oluşturabilirsin.</div>
+  </section>
+
+  <section id="groupView" class="hidden">
+    <div class="section-head">
+      <h2 id="groupTitle">Grup</h2>
+      <div>
+        <button class="danger-link" id="deleteCurrentGroup" type="button" style="margin-right:10px">🗑️ Grubu Sil</button>
+        <button class="back" id="backGroups" type="button">← Gruplar</button>
+      </div>
+    </div>
+    <div class="people" id="groupPeople"></div>
+  </section>
+  <p class="note">Kişiler ve gruplar bu tarayıcıda saklanır. Kaydedilen kişi butonuna dokununca telefonun arama ekranı açılır.</p>
+</main>
+
+<div class="modal-backdrop" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+ <div class="modal"><h2 id="groupModalTitle">Grup Ekle</h2><p>Yeni grubun adını yazıp kaydet.</p>
+  <form id="groupForm"><input id="groupName" maxlength="40" placeholder="Grup adı" required>
+   <div class="modal-actions"><button type="button" class="btn" id="cancelGroup">İptal</button><button type="submit" class="btn primary">Kaydet</button></div>
+  </form>
+ </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const STORAGE_KEY = "hizliAramaRehberi_sifirdan_v1";
+  let data = { groups: [], people: [] };
+
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (stored && Array.isArray(stored.groups) && Array.isArray(stored.people)) {
+      data = stored;
+    }
+  } catch (e) {}
+
+  let view = "home", activeGroupId = null, editing = false;
+  const $ = id => document.getElementById(id);
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function activeGroup() {
+    return data.groups.find(g => g.id === activeGroupId);
+  }
+
+  function peopleFor(groupId) {
+    return data.people.filter(p => (p.groupId || null) === (groupId || null));
+  }
+
+  function deleteGroup(groupId) {
+    const g = data.groups.find(item => item.id === groupId);
+    if (!g) return;
+    if (confirm(`"${g.name}" grubunu silmek istediğinize emin misiniz?`)) {
+      const keepPeople = confirm(`Bu gruptaki kişiler silinmeyip Ana Sayfa'ya taşınsın mı?\n\n[Tamam]: Kişileri Ana Sayfaya Taşı\n[İptal]: Kişileri De Kalıcı Olarak Sil`);
+      if (keepPeople) {
+        data.people.forEach(p => { if (p.groupId === groupId) p.groupId = null; });
+      } else {
+        data.people = data.people.filter(p => p.groupId !== groupId);
+      }
+      data.groups = data.groups.filter(item => item.id !== groupId);
+      save();
+      if (activeGroupId === groupId) {
+        activeGroupId = null;
+        view = "groups";
+      }
+      updateView();
+    }
+  }
+
+  function updateView() {
+    $("homeView").classList.toggle("hidden", view !== "home");
+    $("groupsView").classList.toggle("hidden", view !== "groups");
+    $("groupView").classList.toggle("hidden", view !== "group");
+    
+    $("editToggle").textContent = editing ? "✓ Düzenlemeyi Bitir" : "✏️ Kişileri Düzenle";
+    $("editToggle").classList.toggle("primary", editing);
+
+    renderPeople("homePeople", null);
+    
+    const list = $("groupList");
+    list.innerHTML = "";
+    data.groups.forEach(g => {
+      const card = document.createElement("div");
+      card.className = "group-card";
+      card.innerHTML = `
+        <button type="button" class="group-item-btn">${esc(g.name)}</button>
+        <button type="button" class="group-del-btn" title="Grubu Sil">🗑️</button>
+      `;
+      card.querySelector(".group-item-btn").onclick = () => {
+        activeGroupId = g.id;
+        view = "group";
+        editing = false;
+        updateView();
+      };
+      card.querySelector(".group-del-btn").onclick = (e) => {
+        e.stopPropagation();
+        deleteGroup(g.id);
+      };
+      list.appendChild(card);
+    });
+    
+    $("groupsEmpty").classList.toggle("hidden", data.groups.length > 0);
+    
+    const g = activeGroup();
+    if (g) {
+      $("groupTitle").textContent = g.name;
+      renderPeople("groupPeople", g.id);
+    }
+  }
+
+  function renderPeople(containerId, groupId) {
+    const container = $(containerId);
+    if (!container) return;
+    const people = peopleFor(groupId);
+    container.innerHTML = "";
+    
+    if (containerId === "homePeople") {
+      $("homeCount").textContent = people.length ? people.length + " kişi" : "";
+    }
+
+    people.forEach(p => {
+      const card = document.createElement("div");
+      card.className = "person" + (editing ? " editor" : "");
+      
+      if (editing) {
+        card.innerHTML = `
+          <div class="fields">
+            <input class="edit-name" maxlength="60" aria-label="Ad Soyad" placeholder="Ad Soyad" value="${esc(p.name)}">
+            <input class="edit-phone" maxlength="24" aria-label="Telefon numarası" placeholder="Telefon numarası" inputmode="tel" value="${esc(p.phone)}">
+            <div class="field-buttons">
+              <button type="button" class="smallbtn save-edit">Kaydet</button>
+              <button type="button" class="delbtn delete-person" title="Kişiyi Sil">🗑️ Sil</button>
+            </div>
+          </div>`;
+        card.querySelector(".save-edit").onclick = () => {
+          const name = card.querySelector(".edit-name").value.trim();
+          const phone = card.querySelector(".edit-phone").value.trim();
+          if (!name || !phone) { alert("Lütfen isim ve telefon numarasını gir."); return; }
+          p.name = name;
+          p.phone = phone;
+          save();
+          updateView();
+        };
+        card.querySelector(".delete-person").onclick = () => {
+          if (confirm(`${p.name} silinsin mi?`)) {
+            data.people = data.people.filter(item => item.id !== p.id);
+            save();
+            updateView();
+          }
+        };
+      } else {
+        card.innerHTML = `<button class="call" type="button" aria-label="${esc(p.name || "Kişi")} ara"><span class="name">${esc(p.name)}</span><span class="number">${esc(p.phone)}</span></button><span class="phone" aria-hidden="true">☎</span>`;
+        card.querySelector(".call").onclick = () => {
+          let n = String(p.phone || "").replace(/\D/g, "");
+          if (!n) { alert("Önce Kişileri Düzenle ile isim ve telefon kaydet."); return; }
+          if (n.startsWith("0")) n = "+90" + n.slice(1);
+          else if (n.startsWith("90")) n = "+" + n;
+          else if (!n.startsWith("+")) n = "+90" + n;
+          location.href = "tel:" + n;
+        };
+      }
+      container.appendChild(card);
+    });
+
+    const blank = document.createElement("div");
+    blank.className = "person" + (editing ? " editor" : "");
+    if (editing) {
+      blank.innerHTML = '<div class="fields"><input class="new-name" maxlength="60" aria-label="Yeni kişi adı" placeholder="İsim"><input class="new-phone" maxlength="24" aria-label="Yeni telefon numarası" placeholder="Telefon numarası" inputmode="tel"><button type="button" class="smallbtn save-next">Kaydet ve Yeni Kişi</button></div>';
+      blank.querySelector(".save-next").onclick = () => {
+        const name = blank.querySelector(".new-name").value.trim();
+        const phone = blank.querySelector(".new-phone").value.trim();
+        if (!name || !phone) { alert("Lütfen isim ve telefon numarasını gir."); return; }
+        data.people.push({ id: uid(), name, phone, groupId: groupId || null });
+        save();
+        updateView();
+      };
+    } else {
+      blank.innerHTML = '<button class="call" type="button" aria-label="Boş kişi butonu"><span class="name">&nbsp;</span><span class="number">&nbsp;</span></button><span class="phone" aria-hidden="true">＋</span>';
+      blank.querySelector(".call").onclick = () => { alert("Bu boş butona kişi eklemek için üstteki “Kişileri Düzenle” düğmesine bas."); };
+    }
+    container.appendChild(blank);
+  }
+
+  // Olay Dinleyicileri (Event Listeners)
+  $("editToggle").onclick = () => {
+    editing = !editing;
+    updateView();
+  };
+
+  $("groupsButton").onclick = () => {
+    view = "groups";
+    editing = false;
+    updateView();
+  };
+
+  $("backHome").onclick = () => {
+    view = "home";
+    editing = false;
+    updateView();
+  };
+
+  $("backGroups").onclick = () => {
+    view = "groups";
+    editing = false;
+    updateView();
+  };
+
+  $("deleteCurrentGroup").onclick = () => {
+    if (activeGroupId) deleteGroup(activeGroupId);
+  };
+
+  $("addGroup").onclick = () => {
+    $("groupName").value = "";
+    $("groupModal").classList.add("open");
+    setTimeout(() => $("groupName").focus(), 30);
+  };
+
+  $("cancelGroup").onclick = () => $("groupModal").classList.remove("open");
+  
+  $("groupModal").onclick = e => {
+    if (e.target === $("groupModal")) $("groupModal").classList.remove("open");
+  };
+
+  $("groupForm").onsubmit = e => {
+    e.preventDefault();
+    const name = $("groupName").value.trim();
+    if (!name) return;
+    if (data.groups.some(g => g.name.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR"))) {
+      alert("Bu isimde bir grup zaten var.");
+      return;
+    }
+    data.groups.push({ id: uid(), name });
+    save();
+    $("groupModal").classList.remove("open");
+    view = "groups";
+    editing = false;
+    updateView();
+  };
+
+  // İlk yüklemede görünümü güncelle
+  updateView();
+});
+</script>
+</body>
+</html>
