@@ -5,16 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1769aa">
 <title>Hızlı Arama Rehberi</title>
+<!-- Excel (.xls/.xlsx) okumak için SheetJS Kütüphanesi -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-:root{--blue:#1769aa;--dark:#124a7b;--bg:#f2f5f9;--ink:#172435;--muted:#607286;--line:#dfe7ef;--green:#16834a;--danger:#d32f2f}
+:root{--blue:#1769aa;--dark:#124a7b;--bg:#f2f5f9;--ink:#172435;--muted:#607286;--line:#dfe7ef;--green:#16834a;--danger:#d32f2f;--orange:#d97706}
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
 header{background:linear-gradient(135deg,var(--dark),#2186c7);color:#fff;padding:20px 14px;text-align:center}
 h1{margin:0 0 5px;font-size:clamp(22px,5vw,29px)}header p{margin:0;font-size:14px;opacity:.92}
 main{max-width:900px;margin:auto;padding:14px}
-.toolbar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
-.btn{border:0;border-radius:10px;padding:12px 8px;font-weight:700;font-size:14px;cursor:pointer;background:#fff;color:#174c78;box-shadow:0 2px 7px #10243b12}
-.btn.primary{background:var(--blue);color:#fff}.btn.green{background:var(--green);color:#fff}
+.toolbar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.btn{border:0;border-radius:10px;padding:12px 6px;font-weight:700;font-size:13px;cursor:pointer;background:#fff;color:#174c78;box-shadow:0 2px 7px #10243b12;text-align:center;display:inline-flex;align-items:center;justify-content:center}
+.btn.primary{background:var(--blue);color:#fff}.btn.green{background:var(--green);color:#fff}.btn.orange{background:var(--orange);color:#fff}
 .section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
 .section-head h2{font-size:17px;margin:0;overflow-wrap:anywhere}
 .people,.group-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start}
@@ -41,16 +43,18 @@ main{max-width:900px;margin:auto;padding:14px}
 .modal form{display:grid;gap:10px}.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
 .note{font-size:12px;color:var(--muted);text-align:center;line-height:1.5;margin:16px 0 4px}
 .hidden{display:none!important}
-@media(max-width:420px){main{padding:10px}.toolbar{gap:6px}.btn{font-size:12px;padding:11px 4px}.people,.group-list{gap:8px}.call{padding:11px 8px}.name{font-size:13px}.number{font-size:11px}.phone{font-size:17px;padding:0 7px}.person{min-height:70px}}
+@media(max-width:500px){main{padding:10px}.toolbar{grid-template-columns:1fr 1fr;gap:6px}.btn{font-size:12px;padding:10px 4px}.people,.group-list{gap:8px}.call{padding:11px 8px}.name{font-size:13px}.number{font-size:11px}.phone{font-size:17px;padding:0 7px}.person{min-height:70px}}
 </style>
 </head>
 <body>
 <header><h1>📞 Hızlı Arama Rehberi</h1><p>Kişilerini düzenle, gruplarını oluştur, kolayca ara.</p></header>
 <main>
   <nav class="toolbar">
-    <button class="btn" id="editToggle" type="button">✏️ Kişileri Düzenle</button>
+    <button class="btn" id="editToggle" type="button">✏️ Düzenle</button>
     <button class="btn primary" id="groupsButton" type="button">📂 Gruplar</button>
     <button class="btn green" id="addGroup" type="button">＋ Grup Ekle</button>
+    <button class="btn orange" id="uploadBtn" type="button">📥 Rehber Yükle</button>
+    <input type="file" id="excelFileInput" accept=".xls,.xlsx,.csv" class="hidden">
   </nav>
 
   <section id="homeView">
@@ -142,7 +146,7 @@ document.addEventListener("DOMContentLoaded", function() {
     $("groupsView").classList.toggle("hidden", view !== "groups");
     $("groupView").classList.toggle("hidden", view !== "group");
     
-    $("editToggle").textContent = editing ? "✓ Düzenlemeyi Bitir" : "✏️ Kişileri Düzenle";
+    $("editToggle").textContent = editing ? "✓ Bitir" : "✏️ Düzenle";
     $("editToggle").classList.toggle("primary", editing);
 
     renderPeople("homePeople", null);
@@ -246,10 +250,102 @@ document.addEventListener("DOMContentLoaded", function() {
       };
     } else {
       blank.innerHTML = '<button class="call" type="button" aria-label="Boş kişi butonu"><span class="name">&nbsp;</span><span class="number">&nbsp;</span></button><span class="phone" aria-hidden="true">＋</span>';
-      blank.querySelector(".call").onclick = () => { alert("Bu boş butona kişi eklemek için üstteki “Kişileri Düzenle” düğmesine bas."); };
+      blank.querySelector(".call").onclick = () => { alert("Bu boş butona kişi eklemek için üstteki “Düzenle” düğmesine bas."); };
     }
     container.appendChild(blank);
   }
+
+  // --- Excel / XLS Dosyası Yükleme (Tüm Sekmeleri / Grupları Otomatik Alma) ---
+  $("uploadBtn").onclick = () => {
+    $("excelFileInput").click();
+  };
+
+  $("excelFileInput").onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      try {
+        const arrayBuffer = evt.target.result;
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        
+        let totalAdded = 0;
+        let createdGroupsCount = 0;
+
+        const replaceChoice = confirm(`Excel dosyasındaki tüm sekmeler grup olarak yüklenecektir.\n\n[Tamam]: Mevcut rehberin üzerine EKLE\n[İptal]: Tüm rehberi SIFIRLAYIP yeni verileri yükle`);
+
+        if (!replaceChoice) {
+          data.groups = [];
+          data.people = [];
+        }
+
+        // Excel'deki TÜM Sekmeleri (Sheet) Teker Teker Dolaş
+        workbook.SheetNames.forEach(sheetName => {
+          const cleanSheetName = sheetName.trim();
+          if (!cleanSheetName) return;
+
+          // Bu sekme adı ile mevcut bir grup var mı kontrol et, yoksa yeni grup oluştur
+          let targetGroup = data.groups.find(g => g.name.toLocaleLowerCase("tr-TR") === cleanSheetName.toLocaleLowerCase("tr-TR"));
+          if (!targetGroup) {
+            targetGroup = { id: uid(), name: cleanSheetName };
+            data.groups.push(targetGroup);
+            createdGroupsCount++;
+          }
+
+          const worksheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          rows.forEach(row => {
+            if (!row || row.length === 0) return;
+            
+            let name = "", phone = "";
+            row.forEach(cell => {
+              if (cell === null || cell === undefined) return;
+              const strVal = String(cell).trim();
+              if (!strVal) return;
+
+              const digits = strVal.replace(/\D/g, "");
+              if (digits.length >= 7 && !phone) {
+                phone = strVal;
+              } else if (!name) {
+                name = strVal;
+              }
+            });
+
+            if (name && phone) {
+              data.people.push({
+                id: uid(),
+                name: name,
+                phone: phone,
+                groupId: targetGroup.id
+              });
+              totalAdded++;
+            }
+          });
+        });
+
+        if (totalAdded === 0) {
+          alert("Excel dosyasında geçerli bir kişi/numara kaydı bulunamadı.");
+          return;
+        }
+
+        save();
+        view = "groups"; // Yükleme sonrası doğrudan Gruplar sekmesini aç
+        editing = false;
+        updateView();
+        alert(`İşlem Başarılı!\n• Toplam ${totalAdded} kişi yüklendi.\n• ${workbook.SheetNames.length} grup/sekme işlendi.`);
+
+      } catch (err) {
+        console.error(err);
+        alert("Excel dosyası okunurken bir hata oluştu. Lütfen dosya biçimini kontrol edin.");
+      } finally {
+        $("excelFileInput").value = "";
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
 
   // Olay Dinleyicileri (Event Listeners)
   $("editToggle").onclick = () => {
@@ -307,7 +403,6 @@ document.addEventListener("DOMContentLoaded", function() {
     updateView();
   };
 
-  // İlk yüklemede görünümü güncelle
   updateView();
 });
 </script>
