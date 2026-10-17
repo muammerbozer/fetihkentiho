@@ -58,14 +58,14 @@ main{max-width:900px;margin:auto;padding:14px}
   </nav>
 
   <section id="homeView">
-    <div class="section-head"><h2>Ana Sayfa</h2><span id="homeCount" style="font-size:12px;color:#607286"></span></div>
+    <div class="section-head"><h2>Ana Sayfa (Elle Giriş)</h2><span id="homeCount" style="font-size:12px;color:#607286"></span></div>
     <div class="people" id="homePeople"></div>
   </section>
 
   <section id="groupsView" class="hidden">
     <div class="section-head"><h2>Gruplarım</h2><button class="back" id="backHome" type="button">← Ana sayfa</button></div>
     <div class="group-list" id="groupList"></div>
-    <div class="empty hidden" id="groupsEmpty">Henüz grup yok. Sağdaki “Grup Ekle” düğmesiyle oluşturabilirsin.</div>
+    <div class="empty hidden" id="groupsEmpty">Henüz grup yok. Sağdaki “Grup Ekle” veya “Rehber Yükle” düğmesiyle oluşturabilirsin.</div>
   </section>
 
   <section id="groupView" class="hidden">
@@ -91,7 +91,8 @@ main{max-width:900px;margin:auto;padding:14px}
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-  const STORAGE_KEY = "hizliAramaRehberi_sifirdan_v1";
+  // Versiyon anahtarı güncellenerek önceki tüm varsayılan/kayıtlı veriler sıfırlandı
+  const STORAGE_KEY = "hizliAramaRehberi_v2";
   let data = { groups: [], people: [] };
 
   try {
@@ -125,12 +126,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const g = data.groups.find(item => item.id === groupId);
     if (!g) return;
     if (confirm(`"${g.name}" grubunu silmek istediğinize emin misiniz?`)) {
-      const keepPeople = confirm(`Bu gruptaki kişiler silinmeyip Ana Sayfa'ya taşınsın mı?\n\n[Tamam]: Kişileri Ana Sayfaya Taşı\n[İptal]: Kişileri De Kalıcı Olarak Sil`);
-      if (keepPeople) {
-        data.people.forEach(p => { if (p.groupId === groupId) p.groupId = null; });
-      } else {
-        data.people = data.people.filter(p => p.groupId !== groupId);
-      }
+      data.people = data.people.filter(p => p.groupId !== groupId);
       data.groups = data.groups.filter(item => item.id !== groupId);
       save();
       if (activeGroupId === groupId) {
@@ -189,7 +185,7 @@ document.addEventListener("DOMContentLoaded", function() {
     container.innerHTML = "";
     
     if (containerId === "homePeople") {
-      $("homeCount").textContent = people.length ? people.length + " kişi" : "";
+      $("homeCount").textContent = people.length ? people.length + " kişi" : "0 kişi";
     }
 
     people.forEach(p => {
@@ -255,7 +251,7 @@ document.addEventListener("DOMContentLoaded", function() {
     container.appendChild(blank);
   }
 
-  // --- Excel / XLS Dosyası Yükleme (Tüm Sekmeleri / Grupları Otomatik Alma) ---
+  // --- Excel Yükleme: Sadece Excel Sekmelerini Gruplara Yükler ---
   $("uploadBtn").onclick = () => {
     $("excelFileInput").click();
   };
@@ -271,27 +267,21 @@ document.addEventListener("DOMContentLoaded", function() {
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         
         let totalAdded = 0;
-        let createdGroupsCount = 0;
 
-        const replaceChoice = confirm(`Excel dosyasındaki tüm sekmeler grup olarak yüklenecektir.\n\n[Tamam]: Mevcut rehberin üzerine EKLE\n[İptal]: Tüm rehberi SIFIRLAYIP yeni verileri yükle`);
+        // Ana Sayfa kişilerimizi koruyoruz (groupId bulunmayanlar)
+        const homePeople = data.people.filter(p => !p.groupId);
 
-        if (!replaceChoice) {
-          data.groups = [];
-          data.people = [];
-        }
+        // Grupları ve grup kişilerini temizleyip sadece yeni Excel gruplarını yüklüyoruz
+        data.groups = [];
+        data.people = [...homePeople];
 
-        // Excel'deki TÜM Sekmeleri (Sheet) Teker Teker Dolaş
+        // Excel'deki her bir sekmeyi (Sheet) tek tek Grup olarak işle
         workbook.SheetNames.forEach(sheetName => {
           const cleanSheetName = sheetName.trim();
           if (!cleanSheetName) return;
 
-          // Bu sekme adı ile mevcut bir grup var mı kontrol et, yoksa yeni grup oluştur
-          let targetGroup = data.groups.find(g => g.name.toLocaleLowerCase("tr-TR") === cleanSheetName.toLocaleLowerCase("tr-TR"));
-          if (!targetGroup) {
-            targetGroup = { id: uid(), name: cleanSheetName };
-            data.groups.push(targetGroup);
-            createdGroupsCount++;
-          }
+          const newGroup = { id: uid(), name: cleanSheetName };
+          data.groups.push(newGroup);
 
           const worksheet = workbook.Sheets[sheetName];
           const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
@@ -318,7 +308,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 id: uid(),
                 name: name,
                 phone: phone,
-                groupId: targetGroup.id
+                groupId: newGroup.id // SADECE ilgili gruba atanır, Ana Sayfaya eklenmez
               });
               totalAdded++;
             }
@@ -326,15 +316,15 @@ document.addEventListener("DOMContentLoaded", function() {
         });
 
         if (totalAdded === 0) {
-          alert("Excel dosyasında geçerli bir kişi/numara kaydı bulunamadı.");
+          alert("Excel dosyasında geçerli kişi/numara kaydı bulunamadı.");
           return;
         }
 
         save();
-        view = "groups"; // Yükleme sonrası doğrudan Gruplar sekmesini aç
+        view = "groups"; // Yükleme sonrası doğrudan Gruplarım sayfasına geç
         editing = false;
         updateView();
-        alert(`İşlem Başarılı!\n• Toplam ${totalAdded} kişi yüklendi.\n• ${workbook.SheetNames.length} grup/sekme işlendi.`);
+        alert(`İşlem Başarılı!\n• Excel'deki ${workbook.SheetNames.length} sekme grup olarak yüklendi.\n• Toplam ${totalAdded} kişi gruplara eklendi.\n• Ana Sayfaya hiçbir numara atanmadı.`);
 
       } catch (err) {
         console.error(err);
